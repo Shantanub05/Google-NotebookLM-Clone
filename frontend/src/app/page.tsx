@@ -35,7 +35,8 @@ export default function HomePage() {
       window.removeEventListener('beforeunload', handleCleanup);
       handleCleanup();
     };
-  }, [sessionId, deleteSession]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]); // deleteSession.mutate is stable and doesn't need to be in deps
 
   return (
     <AppLayout
