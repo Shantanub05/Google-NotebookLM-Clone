@@ -63,3 +63,18 @@ export function useClearHistory() {
     },
   });
 }
+
+export function useDeleteSession() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (sessionId: string) => apiClient.deleteSession(sessionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+    },
+    onError: (error: any) => {
+      // Silently fail - this is for cleanup on unmount
+      console.error('Failed to delete session:', error);
+    },
+  });
+}

@@ -121,18 +121,20 @@ export class ChatController {
   }
 
   /**
-   * Delete a chat session
+   * Delete a chat session and cleanup files
    */
   @Delete(':sessionId')
   async deleteSession(@Param('sessionId') sessionId: string) {
     try {
-      this.chatService.deleteSession(sessionId);
+      this.logger.log(`Deleting session: ${sessionId}`);
+      await this.chatService.deleteSession(sessionId);
 
       return {
         success: true,
-        message: 'Session deleted successfully',
+        message: 'Session and associated files deleted successfully',
       };
     } catch (error) {
+      this.logger.error(`Error deleting session: ${error.message}`);
       throw new HttpException(
         {
           success: false,

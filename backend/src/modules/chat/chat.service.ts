@@ -226,11 +226,32 @@ export class ChatService {
   }
 
   /**
-   * Delete a chat session
+   * Delete a chat session and cleanup associated files
    */
-  deleteSession(sessionId: string): void {
-    this.sessions.delete(sessionId);
-    this.logger.log(`Deleted session: ${sessionId}`);
+  async deleteSession(sessionId: string): Promise<void> {
+    const session = this.sessions.get(sessionId);
+
+    if (!session) {
+      this.logger.warn(`Session not found for deletion: ${sessionId}`);
+      return;
+    }
+
+    try {
+      this.logger.log(`Deleting session and cleaning up files: ${sessionId}`);
+
+      // Delete associated PDF document and vectors
+      await this.pdfService.deleteDocument(session.documentId);
+
+      // Remove session from memory
+      this.sessions.delete(sessionId);
+
+      this.logger.log(`Session deleted successfully: ${sessionId}`);
+    } catch (error) {
+      this.logger.error(`Error deleting session: ${error.message}`);
+      // Still remove session from memory even if file cleanup fails
+      this.sessions.delete(sessionId);
+      throw error;
+    }
   }
 
   /**

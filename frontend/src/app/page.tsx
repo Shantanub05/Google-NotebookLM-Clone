@@ -1,11 +1,13 @@
 'use client';
 
+import { useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { AppLayout } from '@/components/layout/app-layout';
 import { Sidebar } from '@/components/layout/sidebar';
 import { PdfUpload } from '@/components/pdf/pdf-upload';
 import { ChatPanel } from '@/components/chat/chat-panel';
 import { useAppStore } from '@/store/app-store';
+import { useDeleteSession } from '@/hooks/use-chat';
 
 // Dynamically import PdfViewer with SSR disabled to avoid DOMMatrix errors
 const PdfViewer = dynamic(
@@ -14,7 +16,26 @@ const PdfViewer = dynamic(
 );
 
 export default function HomePage() {
-  const { documentId } = useAppStore();
+  const { documentId, sessionId } = useAppStore();
+  const deleteSession = useDeleteSession();
+
+  // Cleanup session when user leaves
+  useEffect(() => {
+    const handleCleanup = () => {
+      if (sessionId) {
+        deleteSession.mutate(sessionId);
+      }
+    };
+
+    // Cleanup on page unload (browser close, tab close, navigation)
+    window.addEventListener('beforeunload', handleCleanup);
+
+    // Cleanup on component unmount
+    return () => {
+      window.removeEventListener('beforeunload', handleCleanup);
+      handleCleanup();
+    };
+  }, [sessionId, deleteSession]);
 
   return (
     <AppLayout
