@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: notebooklm-backend
+    env: node
+    region: oregon
+    buildCommand: cd backend && yarn install && yarn build
+    startCommand: cd backend && yarn start:prod
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: PINECONE_API_KEY
+        sync: false
+      - key: PINECONE_INDEX
+        value: notebooklm-clone
+      - key: VECTOR_DB
+        value: pinecone
+      - key: FRONTEND_URL
+        sync: false
+      - key: MAX_FILE_SIZE
+        value: 52428800
+      - key: CHUNK_SIZE
+        value: 500
+      - key: CHUNK_OVERLAP
+        value: 50
+      - key: TOP_K_RESULTS
+        value: 5
+      - key: EMBEDDING_MODEL
+        value: text-embedding-3-small
+      - key: CHAT_MODEL
+        value: gpt-4o
+      - key: MAX_TOKENS
+        value: 4096
+      - key: TEMPERATURE
+        value: 0.7
