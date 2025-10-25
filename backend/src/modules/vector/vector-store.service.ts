@@ -245,15 +245,19 @@ export class VectorStoreService implements OnModuleInit {
       const queryEmbedding = await this.openaiService.createEmbedding(query);
 
       // Search in Pinecone
+      // Note: Serverless indexes may have issues with metadata filtering
+      // Query without filter and filter results in-memory if needed
+      const queryK = filter ? k * 5 : k; // Get more results if we need to filter
+
       const queryResponse = await this.pineconeIndex.query({
         vector: queryEmbedding,
-        topK: k,
+        topK: queryK,
         includeMetadata: true,
-        filter: filter,
+        // Don't use filter on serverless - filter in-memory instead
       });
 
-      // Format results
-      const searchResults: SearchResult[] = queryResponse.matches.map((match: any) => ({
+      // Format and filter results
+      let searchResults: SearchResult[] = queryResponse.matches.map((match: any) => ({
         id: match.id,
         text: match.metadata.text,
         score: match.score,
@@ -265,6 +269,21 @@ export class VectorStoreService implements OnModuleInit {
           endChar: match.metadata.endChar,
         },
       }));
+
+      // Apply in-memory filtering if filter is provided
+      if (filter) {
+        searchResults = searchResults.filter((result) => {
+          for (const [key, value] of Object.entries(filter)) {
+            if ((result.metadata as any)[key] !== value) {
+              return false;
+            }
+          }
+          return true;
+        });
+
+        // Trim to requested topK after filtering
+        searchResults = searchResults.slice(0, k);
+      }
 
       this.logger.log(`Found ${searchResults.length} results in Pinecone`);
       return searchResults;
@@ -348,12 +367,34 @@ export class VectorStoreService implements OnModuleInit {
 
       this.logger.log(`Deleting document from Pinecone: ${documentId}`);
 
-      // Delete by metadata filter
-      await this.pineconeIndex.deleteMany({
-        filter: { documentId: { $eq: documentId } },
+      // Serverless indexes don't support delete by metadata
+      // Instead, we query with a high topK to get all matching vectors, then delete by IDs
+
+      // Create a dummy query vector (all zeros) - we only care about metadata
+      const dummyVector = new Array(1536).fill(0);
+
+      // Query for all vectors with this documentId
+      const queryResponse = await this.pineconeIndex.query({
+        vector: dummyVector,
+        topK: 10000, // High number to get all chunks
+        includeMetadata: true,
       });
 
-      this.logger.log(`Deleted document ${documentId} from Pinecone`);
+      // Filter results by documentId in-memory
+      const matchingIds = queryResponse.matches
+        .filter((match: any) => match.metadata.documentId === documentId)
+        .map((match: any) => match.id);
+
+      if (matchingIds.length > 0) {
+        this.logger.log(`Found ${matchingIds.length} vectors to delete for document ${documentId}`);
+
+        // Delete by IDs
+        await this.pineconeIndex.deleteMany(matchingIds);
+
+        this.logger.log(`Deleted ${matchingIds.length} vectors for document ${documentId}`);
+      } else {
+        this.logger.log(`No vectors found for document ${documentId}`);
+      }
     } catch (error) {
       this.logger.error(`Error deleting document from Pinecone: ${error.message}`);
       throw error;
